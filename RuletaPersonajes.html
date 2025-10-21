@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overwatch 2 Randomizer</title>
+  <style>
+    :root {
+      /* Paleta */
+      --orange: #f97316;
+      --orange-600: #ea580c;
+      --orange-700: #c2410c;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --card: #ffffff;
+      --line: #f2f2f2;
+      --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+
+      /* Cambia esta ruta para tu imagen de fondo (se verá borrosa) */
+      --bg-image: url('images/fondo.webp');
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: #ffffff;
+      display: grid;
+      place-items: center;
+      padding: clamp(16px, 3vw, 32px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Fondo borroso */
+    .bg-blur {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+    }
+    .bg-blur::before {
+      content: "";
+      position: absolute;
+      inset: -20px;
+      background-image: var(--bg-image);
+      background-size: cover;
+      background-position: center;
+      filter: blur(8px) saturate(1.15);
+      transform: scale(1.03);
+    }
+    .bg-blur::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,247,237,0.75));
+      z-index: -1;
+    }
+
+    main { width: 100%; max-width: 440px; }
+
+    /* Animaciones */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes imgPop {
+      0% { opacity: 0; transform: scale(0.92) rotate(-2deg); }
+      60% { opacity: 1; transform: scale(1.02) rotate(0deg); }
+      100% { transform: scale(1); }
+    }
+    @keyframes ringPulse {
+      0% { opacity: 0.9; transform: scale(0.92); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+    @keyframes tap {
+      0% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(1px) scale(0.985); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: clamp(20px, 3.2vw, 28px);
+      display: grid;
+      justify-items: center;
+      gap: 16px;
+      animation: fadeInUp 600ms cubic-bezier(.22,1,.36,1) both;
+    }
+
+    header {
+      display: grid;
+      gap: 4px;
+      justify-items: center;
+      text-align: center;
+      margin-bottom: 4px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: clamp(18px, 2.2vw, 20px);
+      line-height: 1.2;
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Barra de progreso */
+    .progress-wrap {
+      width: 100%;
+    }
+    .progress {
+      width: 100%;
+      height: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--orange), var(--orange-600));
+      box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25) inset;
+      transition: width 260ms cubic-bezier(.22,1,.36,1);
+    }
+
+    .character-box {
+      width: min(56vw, 220px);
+      aspect-ratio: 1 / 1;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      background: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+    .character-box::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.12) inset;
+      pointer-events: none;
+    }
+    .character-box::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 2px solid rgba(249,115,22,0.35);
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+    }
+    .character-box.flash::before {
+      animation: ringPulse 600ms ease-out;
+    }
+
+    #character-img {
+      width: 76%;
+      height: 76%;
+      object-fit: cover;
+      border-radius: 12px;
+      opacity: 0;
+      transform: scale(0.98);
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+    #character-img.loaded { opacity: 1; transform: scale(1); }
+    #character-img.pop { animation: imgPop 420ms cubic-bezier(.2,.9,.22,1); }
+
+    .fallback {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: clamp(28px, 6vw, 40px);
+      user-select: none;
+      font-weight: 700;
+    }
+
+    .name {
+      margin: 4px 0 0 0;
+      font-size: clamp(18px, 2.6vw, 22px);
+      font-weight: 800;
+      min-height: 1.6em;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    .counter {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .actions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 6px;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      border-radius: 12px;
+      transition: background-color 160ms ease, box-shadow 160ms ease, transform 60ms ease;
+    }
+    .btn-primary {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--orange);
+      color: #fff;
+      font-size: 16px;
+      box-shadow: 0 4px 16px rgba(234, 88, 12, 0.25);
+    }
+    .btn-primary:hover { background: var(--orange-600); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(1px); background: var(--orange-700); }
+    .btn-primary:focus-visible {
+      outline: 2px solid transparent;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.35);
+    }
+    .btn-primary.tap { animation: tap 180ms ease-out; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .btn-ghost:hover { color: var(--orange-600); transform: translateY(-1px); }
+    .btn-ghost:focus-visible {
+      outline: 2px solid transparent;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25);
+      border-radius: 10px;
+    }
+    .btn-ghost.tap { animation: tap 180ms ease-out; }
+
+    /* Menos animaciones si el usuario lo pide */
+    @media (prefers-reduced-motion: reduce) {
+      .card, #character-img, .btn-primary, .btn-ghost { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-blur" aria-hidden="true"></div>
+
+  <main>
+    <section class="card" aria-labelledby="title">
+      <header>
+        <h1 id="title">Randomizer de Overwatch</h1>
+        <div class="progress-wrap">
+          <div id="progress" class="progress" role="progressbar" aria-label="Progreso de selección" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+        </div>
+      </header>
+
+      <div class="character-box" id="charbox" aria-live="polite" aria-atomic="true">
+        <img id="character-img" alt="" />
+        <div id="fallback" class="fallback">?</div>
+      </div>
+
+      <p id="character-name" class="name" role="status" aria-live="polite">?</p>
+      <p id="counter" class="counter">0/0 (0%)</p>
+
+      <div class="actions">
+        <button id="pick" class="btn-primary" type="button">Elegir personaje</button>
+        <button id="reset" class="btn-ghost" type="button" aria-label="Reiniciar selección">Reiniciar</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // --- Datos base
+    const characters = [
+      "Ana", "Ashe", "Baptiste", "Bastion", "Brigitte", "Cassidy", "D.Va", "Doomfist", "Echo", "Genji",
+      "Hanzo", "Illari", "Junker Queen", "Junkrat", "Kiriko", "Lifeweaver", "Lucio", "Mauga", "Mei", "Mercy",
+      "Moira", "Orisa", "Pharah", "Ramattra", "Reaper", "Reinhardt", "Roadhog", "Sigma", "Sojourn", "Soldier76",
+      "Sombra", "Symmetra", "Torbjorn", "Tracer", "Venture", "Widowmaker", "Winton", "Wrecking Ball", "Zarya", "Zenyatta",
+      "Juno", "Hazard", "Freja"
+    ];
+    const total = characters.length;
+
+    // --- Estado
+    let available = [...characters];
+    let selectedCount = 0;
+
+    // --- UI refs
+    const imgEl = document.getElementById("character-img");
+    const fallbackEl = document.getElementById("fallback");
+    const nameEl = document.getElementById("character-name");
+    const counterEl = document.getElementById("counter");
+    const pickBtn = document.getElementById("pick");
+    const resetBtn = document.getElementById("reset");
+    const charBox = document.getElementById("charbox");
+    const progressEl = document.getElementById("progress");
+    const progressFillEl = document.getElementById("progress-fill");
+
+    // --- Persistencia
+    const STORAGE_KEY = "ow2_randomizer_state_v1";
+
+    function saveState() {
+      try {
+        const state = {
+          available,
+          currentName: nameEl.textContent || "?",
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (_) {
+        // Ignorar errores de almacenamiento
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+
+        // Validación básica
+        if (parsed && Array.isArray(parsed.available)) {
+          // Asegurar que 'available' solo contenga héroes válidos actuales
+          available = parsed.available.filter((c) => characters.includes(c));
+        }
+        if (parsed && typeof parsed.currentName === "string") {
+          const n = parsed.currentName.trim();
+          if (n && n !== "?") {
+            nameEl.textContent = n;
+            showImageFor(n);
+          }
+        }
+      } catch (_) {
+        // Si hay error, se usa el estado por defecto
+      }
+    }
+
+    // --- Utilidades UI
+    function updateCounterAndProgress() {
+      // Recalcular seleccionados por diferencia
+      selectedCount = total - available.length;
+      const percent = total ? Math.round((selectedCount / total) * 100) : 0;
+
+      counterEl.textContent = `${selectedCount}/${total} (${percent}%)`;
+      progressFillEl.style.width = percent + "%";
+      progressEl.setAttribute("aria-valuemax", String(total));
+      progressEl.setAttribute("aria-valuenow", String(selectedCount));
+    }
+
+    function showFallback(char = "?") {
+      imgEl.classList.remove("loaded", "pop");
+      imgEl.removeAttribute("src");
+      imgEl.alt = "";
+      fallbackEl.textContent = char === "?" ? "?" : (char[0] || "?");
+      fallbackEl.style.display = "grid";
+    }
+
+    function animateSelection() {
+      charBox.classList.remove("flash");
+      void charBox.offsetWidth; // reinicia animación
+      charBox.classList.add("flash");
+
+      pickBtn.classList.remove("tap");
+      void pickBtn.offsetWidth;
+      pickBtn.classList.add("tap");
+    }
+
+    function showImageFor(character) {
+      const src = `images/${character}.png`;
+      imgEl.classList.remove("loaded", "pop");
+      fallbackEl.style.display = "none";
+      imgEl.alt = character;
+      imgEl.src = src;
+
+      imgEl.onload = () => {
+        imgEl.classList.add("loaded");
+        imgEl.classList.add("pop");
+        imgEl.addEventListener("animationend", () => imgEl.classList.remove("pop"), { once: true });
+      };
+      imgEl.onerror = () => {
+        showFallback(character);
+      };
+    }
+
+    // --- Lógica
+    function getRandomCharacter() {
+      if (available.length === 0) {
+        alert("Todos los personajes han sido elegidos.");
+        return;
+      }
+      const randomIndex = Math.floor(Math.random() * available.length);
+      const selected = available.splice(randomIndex, 1)[0];
+
+      animateSelection();
+      showImageFor(selected);
+      nameEl.textContent = selected;
+      updateCounterAndProgress();
+      saveState();
+    }
+
+    function resetAll() {
+      available = [...characters];
+      nameEl.textContent = "?";
+      showFallback("?");
+      updateCounterAndProgress();
+
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      resetBtn.classList.remove("tap");
+      void resetBtn.offsetWidth;
+      resetBtn.classList.add("tap");
+    }
+
+    // --- Inicialización
+    updateCounterAndProgress();
+    showFallback("?");
+    loadState();           // intenta cargar estado guardado
+    updateCounterAndProgress(); // actualiza UI tras cargar
+
+    // --- Eventos
+    pickBtn.addEventListener("click", getRandomCharacter);
+    resetBtn.addEventListener("click", resetAll);
+    document.addEventListener("keydown", (e) => { if (e.key === "Enter") getRandomCharacter(); }, { passive: true });
+  </script>
+</body>
+</html>
